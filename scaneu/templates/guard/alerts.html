@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Alerts{% endblock %}
+{% block page_title %}Alerts{% endblock %}
+{% block page_subtitle %}Records to check later.{% endblock %}
+{% block content %}
+<div class="notif-wrap">
+  <section class="panel notif-panel">
+    <div class="notif-header">
+      <nav class="tabs" aria-label="Alert filter">
+        <a class="tab {{ 'active' if not reviewed }}" href="{{ url_for('guard.alerts') }}" {{ 'aria-current="page"'|safe if not reviewed }}>
+          To review <span class="tab-count" data-count="alert" {{ 'hidden' if not alert_count }}>{{ alert_count }}</span>
+        </a>
+        <a class="tab {{ 'active' if reviewed }}" href="{{ url_for('guard.alerts', show='reviewed') }}" {{ 'aria-current="page"'|safe if reviewed }}>Reviewed</a>
+      </nav>
+      {% if not reviewed %}
+      <button class="btn btn-link notif-all" id="review-all" type="button"><i class="bi bi-check2-all"></i> Mark all as reviewed</button>
+      {% endif %}
+    </div>
+    <ul id="alerts" class="notif-list"></ul>
+    <div id="alerts-empty" class="empty-state">
+      <i class="bi bi-check2-circle"></i>
+      <p class="mb-0">{{ 'No reviewed alerts yet.' if reviewed else "You're all caught up." }}</p>
+    </div>
+  </section>
+</div>
+
+<script id="initial-state" type="application/json">{{ state|tojson }}</script>
+<script id="alert-labels" type="application/json">{{ alert_labels|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+{% endblock %}

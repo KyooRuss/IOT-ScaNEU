@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Visitors{% endblock %}
+{% block page_title %}Visitors{% endblock %}
+{% block page_subtitle %}Non-NEU plates registered at the gate.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <i class="bi bi-person-badge panel-icon"></i>
+    <h2 class="panel-title">Registered visitor plates</h2>
+  </div>
+  <div class="table-responsive">
+    <table class="table activity-table align-middle mb-0">
+      <thead><tr><th>Plate Number</th><th>Vehicle</th><th>First Seen</th><th>Last Seen</th><th>Visits</th></tr></thead>
+      <tbody>
+        {% for v in visitors %}
+        <tr>
+          <td class="plate-cell">{{ v.plate_number|plate }}</td>
+          <td class="text-muted-2">{{ [v.vehicle_type, '(' ~ v.vehicle_color ~ ')' if v.vehicle_color]|select|join(' ') or '—' }}</td>
+          <td class="text-nowrap">{{ v.first_seen }}</td>
+          <td class="text-nowrap">{{ v.last_seen }}</td>
+          <td>{{ v.visit_count }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="text-center text-muted-2 py-4">No visitor plates yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
