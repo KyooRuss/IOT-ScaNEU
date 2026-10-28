@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}Dashboard{% endblock %} · ScaNEU</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body>
+{% set endpoint = request.endpoint or '' %}
+{# badge_kind "pending" (amber, vehicles waiting) or "alert" (red, alerts to review); updated live by common.js #}
+{% macro nav_link(target, icon, label, badge=none, badge_kind=none, badge_title=none) -%}
+  <a class="sidebar-link {{ 'active' if endpoint == target }}" href="{{ url_for(target) }}" {{ 'aria-current="page"'|safe if endpoint == target }}>
+    <i class="bi {{ icon }}"></i><span>{{ label }}</span>
+    {%- if badge is not none %}<span class="sidebar-badge sidebar-badge-{{ badge_kind }}" data-count="{{ badge_kind }}" title="{{ badge_title }}" {{ 'hidden' if not badge }}>{{ badge }}</span>{% endif %}
+  </a>
+{%- endmacro %}
+
+<div class="app">
+  <aside class="sidebar-shell offcanvas-lg offcanvas-start" tabindex="-1" id="sidebar" aria-label="Main menu">
+    <div class="sidebar">
+      <div class="sidebar-brand">
+        <i class="bi bi-shield-check"></i>
+        <span class="brand-name">Sca<strong>NEU</strong></span>
+        <button type="button" class="btn-close btn-close-white d-lg-none ms-auto" data-bs-dismiss="offcanvas" data-bs-target="#sidebar" aria-label="Close menu"></button>
+      </div>
+      <div class="sidebar-gate"><span class="dot" data-conn-dot></span> NEU Main Campus Gate 01</div>
+
+      <nav class="sidebar-nav">
+        {{ nav_link('guard.live', 'bi-camera-video', 'Live Log', pending_count, 'pending', 'Vehicles waiting for the guard') }}
+        {{ nav_link('logs.index', 'bi-file-text', 'Records') }}
+        {{ nav_link('guard.alerts', 'bi-bell', 'Alerts', alert_count, 'alert', 'Alerts to review') }}
+        {{ nav_link('admin.visitors', 'bi-person-badge', 'Visitors') }}
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="avatar"><i class="bi bi-person-fill"></i></span>
+        <div>
+          <div class="fw-semibold">Guard Station</div>
+          <div class="small text-sidebar-muted">Security Guard</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-icon d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Open menu">
+        <i class="bi bi-list"></i>
+      </button>
+      <div class="me-auto">
+        <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+        <p class="page-subtitle">{% block page_subtitle %}{% endblock %}</p>
+      </div>
+      <div class="topbar-meta">
+        <span class="d-none d-sm-inline" data-clock-date></span>
+        <span data-clock-time></span>
+        <span class="conn-pill" data-conn>Connecting…</span>
+      </div>
+    </header>
+
+    <main class="content">
+      {% for category, message in get_flashed_messages(with_categories=true) %}
+        <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+{# Pop-ups for vehicles waiting at the gate (common.js) #}
+<div class="toast-container position-fixed end-0 p-3" id="toasts" aria-live="polite" data-live-url="{{ url_for('guard.live') }}"></div>
+
+<script id="flag-labels" type="application/json">{{ FLAG_LABELS|tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/socket.io/socket.io.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/common.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

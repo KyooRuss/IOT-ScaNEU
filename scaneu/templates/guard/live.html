@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Live Log{% endblock %}
+{% block page_title %}Live Log{% endblock %}
+{% block page_subtitle %}Monitor vehicle activity in real-time.{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3">
+  {% for lane in lanes %}
+  <div class="col-xl-6">
+    <section class="panel" data-lane="{{ lane }}">
+      <div class="panel-header">
+        <i class="bi bi-camera-video panel-icon"></i>
+        <h2 class="panel-title">{{ 'Entrance' if lane == 'entrance' else 'Exit' }} Camera</h2>
+        <span class="chip">Lane 0{{ loop.index }}</span>
+        <span class="status-pill ms-auto" data-barrier></span>
+      </div>
+      <div class="camera-view" data-view></div>
+    </section>
+  </div>
+  {% endfor %}
+</div>
+
+<section class="panel">
+  <div class="panel-header">
+    <i class="bi bi-clock-history panel-icon"></i>
+    <h2 class="panel-title">Recent Activity</h2>
+    <a class="view-all ms-auto" href="{{ url_for('logs.index') }}">View All <i class="bi bi-chevron-right"></i></a>
+  </div>
+  <div class="table-responsive">
+    <table class="table activity-table align-middle mb-0">
+      <thead>
+        <tr><th class="thumb-col"><span class="visually-hidden">Photo</span></th><th>Time</th><th>Plate Number</th><th>Vehicle Details</th><th>Type</th><th>Action</th></tr>
+      </thead>
+      <tbody id="recent"></tbody>
+    </table>
+  </div>
+</section>
+
+<div class="modal fade" id="vehicle-modal" tabindex="-1" aria-labelledby="vehicle-modal-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="vehicle-modal-title">Vehicle details</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" data-modal-body></div>
+      <div class="modal-footer" data-modal-actions></div>
+    </div>
+  </div>
+</div>
+
+<script id="initial-state" type="application/json">{{ state|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/live.js') }}"></script>
+{% endblock %}
