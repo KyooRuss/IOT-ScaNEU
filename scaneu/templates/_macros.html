@@ -1,0 +1,8 @@
+{# Server-side twin of typeLabel in static/js/common.js. #}
+{% macro type_label(log) -%}
+  {%- if log.owner_type == 'NEU' %}{% set cls, label = 'neu', 'NEU Card Holder' %}
+  {%- elif log.owner_type == 'Non-NEU' and 'first_visit' in log.flags %}{% set cls, label = 'first', 'First-time Visitor' %}
+  {%- elif log.owner_type == 'Non-NEU' %}{% set cls, label = 'returning', 'Returning Visitor' %}
+  {%- else %}{% set cls, label = 'unknown', 'Unknown' %}{% endif -%}
+  <span class="type-label type-{{ cls }}"><span class="dot"></span>{{ label }}</span>
+{%- endmacro %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import type_label %}
+{% block title %}Records{% endblock %}
+{% block page_title %}Records{% endblock %}
+{% block page_subtitle %}Every vehicle entry and exit at the gate.{% endblock %}
+{% block content %}
+<section class="panel">
+  <div class="panel-header">
+    <i class="bi bi-file-text panel-icon"></i>
+    <h2 class="panel-title">Vehicle logs</h2>
+    <form class="d-flex gap-2 ms-auto" method="get" role="search">
+      <label class="visually-hidden" for="plate-search">Search plate</label>
+      <input class="form-control form-control-sm" id="plate-search" name="plate" value="{{ plate }}" placeholder="Search plate">
+      <button class="btn btn-sm btn-view" type="submit" aria-label="Search"><i class="bi bi-search"></i></button>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table activity-table align-middle mb-0">
+      <thead>
+        <tr><th>#</th><th>Plate Number</th><th>Type</th><th>Vehicle</th><th>Time In</th><th>Time Out</th></tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="text-muted-2">{{ log.id }}</td>
+          <td class="plate-cell">{{ log.plate_read|plate or '—' }}</td>
+          <td>{{ type_label(log) }}</td>
+          <td class="text-muted-2">{{ [log.vehicle_type, '(' ~ log.vehicle_color ~ ')' if log.vehicle_color]|select|join(' ') or '—' }}</td>
+          <td class="text-nowrap">{{ log.time_in or '—' }}</td>
+          <td class="text-nowrap">{{ log.time_out or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted-2 py-4">No records yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<p class="small text-muted-2 mt-2">Showing the latest 200 records.</p>
+{% endblock %}
