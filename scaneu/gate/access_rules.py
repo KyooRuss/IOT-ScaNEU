@@ -26,6 +26,7 @@ FLAG_LABELS = {
     "returning": "Returning visitor",
     "exit_only": "Exit only",
     "no_valid_card": "No valid card",
+    "plate_corrected": "Plate typed by guard",  # set from the Alerts page, not by the rules
 }
 
 
