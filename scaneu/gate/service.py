@@ -16,8 +16,9 @@ from .access_rules import DENIED, GRANTED_BY_GUARD, NON_NEU, PENDING, Card, deci
 LANES = ("entrance", "exit")
 
 LOG_SELECT = """
-    SELECT l.*, COALESCE(l.time_out, l.time_in) AS last_activity
+    SELECT l.*, COALESCE(l.time_out, l.time_in) AS last_activity, u.full_name AS holder_name
     FROM vehicle_logs l
+    LEFT JOIN users u ON u.id = l.user_id
 """
 
 # Finished records the guard should check later (the doc's "review the photo later" /
@@ -29,9 +30,17 @@ ALERT_LABELS = {
     "card_blocked": "Blocked card",
     "denied": "Denied by guard",
 }
-ALERT_SQL = "l.pending_lane IS NULL AND (l.access_result = 'Denied' OR {})".format(
-    " OR ".join(f"(',' || l.flags || ',') LIKE '%,{flag},%'" for flag in ALERT_LABELS if flag != "denied")
-)
+ALERT_PAGE_SIZE = 50
+
+
+def _reason_sql(reason):
+    """SQL condition for one alert reason. Only ever called with ALERT_LABELS keys."""
+    if reason == "denied":
+        return "l.access_result = 'Denied'"
+    return f"(',' || l.flags || ',') LIKE '%,{reason},%'"
+
+
+ALERT_SQL = "l.pending_lane IS NULL AND ({})".format(" OR ".join(_reason_sql(r) for r in ALERT_LABELS))
 
 
 class GateError(Exception):
@@ -129,11 +138,34 @@ def recent_logs(limit=20):
     )]
 
 
-def alert_logs(reviewed=False):
+def _alert_where(reviewed, reason=None):
+    sql = f"{ALERT_SQL} AND l.reviewed_at IS {'NOT ' if reviewed else ''}NULL"
+    if reason in ALERT_LABELS:
+        sql += f" AND {_reason_sql(reason)}"
+    return sql
+
+
+def alert_logs(reviewed=False, reason=None, limit=ALERT_PAGE_SIZE, offset=0):
+    # Reviewed tab: most recently reviewed first. To review: latest activity first.
+    order = "l.reviewed_at DESC, " if reviewed else ""
     return [log_payload(r) for r in get_db().execute(
-        LOG_SELECT + f" WHERE {ALERT_SQL} AND l.reviewed_at IS {'NOT ' if reviewed else ''}NULL"
-        " ORDER BY last_activity DESC, l.id DESC LIMIT 200"
+        LOG_SELECT + f" WHERE {_alert_where(reviewed, reason)}"
+        f" ORDER BY {order}last_activity DESC, l.id DESC LIMIT ? OFFSET ?",
+        (limit, offset),
     )]
+
+
+def alert_page(reviewed=False, reason=None, offset=0):
+    """One page of the Alerts list, and whether more come after it."""
+    alerts = alert_logs(reviewed, reason, limit=ALERT_PAGE_SIZE + 1, offset=offset)
+    return {"alerts": alerts[:ALERT_PAGE_SIZE], "has_more": len(alerts) > ALERT_PAGE_SIZE}
+
+
+def alert_counts(reviewed=False):
+    """Alerts per filter on the Alerts page: "all", then one count per reason."""
+    sums = ", ".join(f"SUM({_reason_sql(r)})" for r in ALERT_LABELS)
+    row = get_db().execute(f"SELECT COUNT(*), {sums} FROM vehicle_logs l WHERE {_alert_where(reviewed)}").fetchone()
+    return {"all": row[0], **{reason: row[i] or 0 for i, reason in enumerate(ALERT_LABELS, start=1)}}
 
 
 def alert_count():
@@ -142,31 +174,61 @@ def alert_count():
     ).fetchone()[0]
 
 
-def review_alert(log_id):
-    """Guard's "Mark as reviewed" on an alert."""
+def review_alert(log_id, plate=None):
+    """Guard's "Mark as reviewed" on an alert, with the plate typed in if the camera could not read it."""
     db = get_db()
     row = db.execute(LOG_SELECT + " WHERE l.id = ?", (log_id,)).fetchone()
     if row is None or not log_payload(row)["alert_reasons"]:
         raise GateError("This record has no alert to review.")
+    if plate:
+        _correct_plate(db, log_payload(row), plate)
     if row["reviewed_at"] is None:
         db.execute("UPDATE vehicle_logs SET reviewed_at = ? WHERE id = ?", (now(), log_id))
-        db.commit()
-        row = db.execute(LOG_SELECT + " WHERE l.id = ?", (log_id,)).fetchone()
-    socketio.emit("alert_update", {"log": log_payload(row), "alert_count": alert_count()})
-    return log_payload(row)
+    db.commit()
+    return _publish_alert(db, log_id)
 
 
-def review_all_alerts():
-    """Guard's "Mark all as reviewed". Returns how many alerts were marked."""
+def unreview_alert(log_id):
+    """Undo "Mark as reviewed": the alert goes back to To review."""
     db = get_db()
     cur = db.execute(
-        "UPDATE vehicle_logs SET reviewed_at = ? WHERE id IN"
-        f" (SELECT l.id FROM vehicle_logs l WHERE {ALERT_SQL} AND l.reviewed_at IS NULL)",
-        (now(),),
+        "UPDATE vehicle_logs SET reviewed_at = NULL WHERE id = ? AND reviewed_at IS NOT NULL", (log_id,)
     )
+    if cur.rowcount == 0:
+        raise GateError("This alert is not marked as reviewed.")
     db.commit()
-    socketio.emit("alert_update", {"log": None, "all_reviewed": True, "alert_count": alert_count()})
-    return cur.rowcount
+    return _publish_alert(db, log_id)
+
+
+def review_all_alerts(reason=None):
+    """Guard's "Mark all as reviewed", for one reason or for all. Returns how many alerts were marked."""
+    db = get_db()
+    ids = [r[0] for r in db.execute(f"SELECT l.id FROM vehicle_logs l WHERE {_alert_where(False, reason)}")]
+    stamp = now()
+    db.executemany("UPDATE vehicle_logs SET reviewed_at = ? WHERE id = ?", [(stamp, i) for i in ids])
+    db.commit()
+    socketio.emit("alert_update", {"log": None, "reviewed_ids": ids, "alert_count": alert_count()})
+    return len(ids)
+
+
+def _correct_plate(db, log, text):
+    """The guard checked the photo of an unreadable plate and typed the plate in."""
+    if "plate_unreadable" not in log["flags"]:
+        raise GateError("Only a plate the camera could not read can be changed here.")
+    plate = normalize_plate(text)
+    if plate is None:
+        raise GateError("Type the plate as letters and numbers, e.g. ABC 1234.")
+    if plate == log["plate_read"]:
+        return
+    flags = log["flags"] if "plate_corrected" in log["flags"] else [*log["flags"], "plate_corrected"]
+    db.execute("UPDATE vehicle_logs SET plate_read = ?, flags = ? WHERE id = ?", (plate, ",".join(flags), log["id"]))
+    db.execute("INSERT INTO guard_actions (log_id, action, created_at) VALUES (?, 'edit', ?)", (log["id"], now()))
+
+
+def _publish_alert(db, log_id):
+    row = db.execute(LOG_SELECT + " WHERE l.id = ?", (log_id,)).fetchone()
+    socketio.emit("alert_update", {"log": log_payload(row), "alert_count": alert_count()})
+    return log_payload(row)
 
 
 def log_payload(row):

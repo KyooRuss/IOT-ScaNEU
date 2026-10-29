@@ -95,9 +95,13 @@ body { background: var(--bg); color: var(--ink); }
 
 /* Pop-up when a vehicle starts waiting (common.js) */
 .toast-container { top: 64px; z-index: 1090; }  /* below the header clock */
+.toast-container.notices { top: auto; }  /* Undo messages: bottom corner (alerts.html) */
 .waiting-toast { border: 0; border-left: 4px solid #f59e0b; border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); }
-.waiting-toast .toast-body { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.waiting-toast .toast-body, .notice-toast .toast-body { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
 .toast-icon { font-size: 1.4rem; color: #f59e0b; }
+/* Confirmation with Undo, e.g. after "Mark as reviewed" (alerts.js) */
+.notice-toast { border: 0; border-left: 4px solid var(--ok); border-radius: 12px; box-shadow: 0 10px 30px rgba(16, 24, 40, .18); }
+.notice-toast .toast-icon { color: var(--ok); }
 .sidebar-section {
   margin: 18px 14px 6px;
   font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
@@ -270,13 +274,33 @@ body { background: var(--bg); color: var(--ink); }
 .notif-all { font-size: .82rem; font-weight: 500; color: var(--accent); text-decoration: none; padding: 0 0 9px; }
 .notif-all:hover { text-decoration: underline; }
 
+/* Filter by reason */
+.notif-filters { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.filter {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px;
+  color: var(--ink); font-size: .8rem; font-weight: 500; text-decoration: none; white-space: nowrap;
+}
+.filter:hover { background: var(--head); color: var(--ink); }
+.filter.active { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.filter.is-empty:not(.active) { color: var(--muted); }
+.filter-count { color: var(--muted); font-size: .74rem; font-variant-numeric: tabular-nums; }
+.filter.active .filter-count { color: var(--accent); }
+
 .notif-list { list-style: none; margin: 0; padding: 0; }
 .notif {
+  position: relative;
   display: flex; align-items: flex-start; gap: 14px;
   padding: 14px 16px; border-bottom: 1px solid var(--line);
 }
 .notif:last-child { border-bottom: 0; }
-.notif.is-unread { background: #f7f9ff; }
+.notif.is-new { background: #f7f9ff; }
+.notif:hover { background: var(--head); }
+/* The title button covers the whole row, so a click anywhere opens the details. */
+.notif-open { display: block; padding: 0; border: 0; background: none; color: inherit; text-align: left; }
+.notif-open::after { content: ""; position: absolute; inset: 0; cursor: pointer; }
+.notif-open:focus-visible { outline: 0; }
+.notif-open:focus-visible::after { outline: 2px solid var(--accent); outline-offset: -2px; }
 .notif-icon {
   width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center; font-size: 1.05rem;
@@ -289,12 +313,15 @@ body { background: var(--bg); color: var(--ink); }
 .notif-meta { color: var(--muted); font-size: .83rem; margin-top: 2px; }
 .notif-plate { color: var(--ink); letter-spacing: .03em; }
 .notif-side { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.notif-times { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .notif-time { font-size: .78rem; color: var(--muted); white-space: nowrap; }
-.notif.is-unread .notif-time::before {
+.notif-reviewed { font-size: .74rem; color: var(--ok); white-space: nowrap; }
+.notif.is-new .notif-time::before {
   content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px;
   border-radius: 50%; background: var(--accent); vertical-align: middle;
 }
 .notif-check {
+  position: relative; z-index: 1;  /* above the row-wide .notif-open */
   width: 32px; height: 32px; padding: 0; border-radius: 50%;
   border: 1px solid var(--line); background: var(--panel); color: var(--muted);
   display: inline-flex; align-items: center; justify-content: center;
@@ -307,6 +334,8 @@ body { background: var(--bg); color: var(--ink); }
 }
 .empty-state { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 32px 0; color: var(--muted); }
 .empty-state .bi { font-size: 2rem; color: var(--ok); }
+.notif-more { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--line); }
+.plate-input { max-width: 220px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 
 /* ---- Other pages ------------------------------------------------------- */
 

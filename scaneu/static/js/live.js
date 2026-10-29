@@ -69,36 +69,16 @@
 
   // ---- vehicle details window ---------------------------------------------
 
-  function detail(label, value) {
-    return el("div", { class: "detail" }, el("div", { class: "detail-label" }, label), el("div", { class: "detail-value" }, value));
-  }
-
   function renderModal() {
     const log = recent.get(modalLogId) || waiting.get(modalLogId);
     if (!log) return;
     const body = modalEl.querySelector("[data-modal-body]");
     const actions = modalEl.querySelector("[data-modal-actions]");
-    const reason = reasons.get(log.id);
 
-    body.replaceChildren(el("div", { class: "row g-3" },
-      el("div", { class: "col-md-6" },
-        el("div", { class: "modal-photo" }, S.photo(log, log.exit_image_path || log.entry_image_path, "camera-photo"))),
-      el("div", { class: "col-md-6" },
-        el("div", { class: "d-flex align-items-center justify-content-between gap-2 mb-3" },
-          el("span", { class: "plate-big" }, S.formatPlate(log.plate_read) || "Unreadable"), S.statusPill(log)),
-        reason ? el("p", { class: "text-muted-2 mb-3" }, reason) : null,
-        el("div", { class: "detail-grid" },
-          detail("Type", S.typeLabel(log)),
-          detail("Vehicle", S.vehicleText(log)),
-          detail("RFID card", log.rfid_uid || "None"),
-          detail("Time in", log.time_in || "—"),
-          detail("Time out", log.time_out || "—"),
-          detail("Stay", S.duration(log.stay_duration_s)),
-          detail("Waiting at", log.pending_lane ? (log.pending_lane === "exit" ? "Exit lane" : "Entrance lane") : "—"),
-        ),
-        S.flagChips(log.flags).length ? el("div", { class: "mt-3" }, S.flagChips(log.flags)) : null,
-      ),
-    ));
+    body.replaceChildren(S.vehicleDetails(log, {
+      note: reasons.get(log.id),
+      rows: [S.detail("Waiting at", log.pending_lane ? (log.pending_lane === "exit" ? "Exit lane" : "Entrance lane") : "—")],
+    }));
 
     if (!log.pending_lane) {
       actions.replaceChildren(el("button", { class: "btn btn-light", type: "button", "data-bs-dismiss": "modal" }, "Close"));

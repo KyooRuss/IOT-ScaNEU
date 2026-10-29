@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import vehicle_modal %}
 {% block title %}Live Log{% endblock %}
 {% block page_title %}Live Log{% endblock %}
 {% block page_subtitle %}Monitor vehicle activity in real-time.{% endblock %}
@@ -35,18 +36,7 @@
   </div>
 </section>
 
-<div class="modal fade" id="vehicle-modal" tabindex="-1" aria-labelledby="vehicle-modal-title" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title h5" id="vehicle-modal-title">Vehicle details</h2>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" data-modal-body></div>
-      <div class="modal-footer" data-modal-actions></div>
-    </div>
-  </div>
-</div>
+{{ vehicle_modal() }}
 
 <script id="initial-state" type="application/json">{{ state|tojson }}</script>
 {% endblock %}

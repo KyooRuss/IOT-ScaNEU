@@ -154,6 +154,82 @@ def test_mark_alert_reviewed(app, client):
     assert client.get("/alerts?show=reviewed").status_code == 200
 
 
+def test_alert_filters_counts_and_pages(app, client, monkeypatch):
+    with app.app_context():
+        unreadable, _ = service.handle_vehicle("entrance", "04A1B2C3", None)
+        expired, _ = service.handle_vehicle("entrance", "04D4E5F6", "NEU5678")
+        service.resolve_pending(expired, "deny")
+        denied, _ = service.handle_vehicle("entrance", None, "BAD0001")
+        service.resolve_pending(denied, "deny")
+        counts = service.alert_counts()
+    assert counts == {"all": 3, "plate_unreadable": 1, "exit_only": 0, "card_expired": 1, "card_blocked": 0, "denied": 2}
+    assert client.get("/alerts/counts").json == counts
+    assert client.get("/alerts?reason=denied").status_code == 200
+    assert client.get("/alerts?reason=nonsense").status_code == 200  # unknown reason = all
+
+    monkeypatch.setattr(service, "ALERT_PAGE_SIZE", 2)
+    first = client.get("/alerts/more?offset=0").json
+    rest = client.get("/alerts/more?offset=2").json
+    assert first["has_more"] and not rest["has_more"]
+    assert [a["id"] for a in first["alerts"] + rest["alerts"]] == [denied, expired, unreadable]
+    only_denied = client.get("/alerts/more?reason=denied").json["alerts"]
+    assert {a["id"] for a in only_denied} == {expired, denied}
+    # The card holder's name comes with every record.
+    assert next(a for a in only_denied if a["id"] == expired)["holder_name"] == "Juan Dela Cruz"
+
+    # "Mark all" while filtered marks only that reason.
+    assert client.post("/alerts/review-all", json={"reason": "denied"}).json == {"reviewed": 2}
+    assert client.post("/alerts/review-all", json={"reason": "nonsense"}).status_code == 400
+    with app.app_context():
+        assert [a["id"] for a in service.alert_logs()] == [unreadable]
+        assert service.alert_counts(reviewed=True)["denied"] == 2
+
+
+def test_undo_mark_as_reviewed(app, client):
+    with app.app_context():
+        log_id, _ = service.handle_vehicle("entrance", None, "BAD0001")
+        service.resolve_pending(log_id, "deny")
+    client.post(f"/alerts/{log_id}/review")
+    res = client.post(f"/alerts/{log_id}/unreview")
+    assert res.status_code == 200 and res.json["log"]["reviewed_at"] is None
+    with app.app_context():
+        assert service.alert_count() == 1
+    assert client.post(f"/alerts/{log_id}/unreview").status_code == 404
+
+
+def test_reviewed_tab_lists_latest_review_first(app, client):
+    with app.app_context():
+        older, _ = service.handle_vehicle("entrance", "04A1B2C3", None)
+        newer, _ = service.handle_vehicle("entrance", "04A1B2C3", None)
+    client.post(f"/alerts/{newer}/review")
+    with app.app_context():
+        get_db().execute("UPDATE vehicle_logs SET reviewed_at = '2000-01-01 00:00:00' WHERE id = ?", (newer,))
+        get_db().commit()
+    client.post(f"/alerts/{older}/review")
+    with app.app_context():
+        assert [a["id"] for a in service.alert_logs(reviewed=True)] == [older, newer]
+
+
+def test_guard_types_unreadable_plate_when_reviewing(app, client):
+    with app.app_context():
+        log_id, _ = service.handle_vehicle("entrance", None, None)
+        service.resolve_pending(log_id, "deny")
+        other, _ = service.handle_vehicle("entrance", None, "BAD0001")
+        service.resolve_pending(other, "deny")
+
+    assert client.post(f"/alerts/{log_id}/review", json={"plate": "!!!"}).status_code == 404
+    assert client.post(f"/alerts/{other}/review", json={"plate": "XYZ 1"}).status_code == 404
+    assert log(app, log_id)["reviewed_at"] is None and log(app, other)["plate_read"] == "BAD0001"
+
+    res = client.post(f"/alerts/{log_id}/review", json={"plate": "jkl-4321"})
+    assert res.status_code == 200
+    assert res.json["log"]["plate_read"] == "JKL4321" and res.json["log"]["reviewed_at"]
+    assert res.json["log"]["flags"][-1] == "plate_corrected"
+    with app.app_context():
+        actions = get_db().execute("SELECT action FROM guard_actions WHERE log_id = ? ORDER BY id", (log_id,)).fetchall()
+    assert [a["action"] for a in actions] == ["deny", "edit"]
+
+
 def test_init_schema_adds_new_columns_and_keeps_data(tmp_path):
     from scaneu.db import SCHEMA, connect, init_schema
 

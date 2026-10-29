@@ -41,7 +41,7 @@ On Linux / the Pi, use `source .venv/bin/activate` and `cp` instead of `copy`.
 
 When a vehicle has to wait, a pop-up with a beep appears on every dashboard page. Click **Review** to open it on Live Log, then **Open barrier** or **Deny**. Browsers only play sound after you have clicked somewhere on the page once. Use the IR switch in the simulator to drive a vehicle through; the barrier closes 3 s after the IR sensor is clear.
 
-**Alerts** lists finished records to check later: plate unreadable, exit without entry, expired or blocked card, and vehicles the guard denied. Click **Mark as reviewed** to move one to the Reviewed tab. In the sidebar, the amber badge on Live Log counts vehicles waiting now; the red badge on Alerts counts alerts not yet reviewed.
+**Alerts** lists finished records to check later: plate unreadable, exit without entry, expired or blocked card, and vehicles the guard denied. The buttons above the list filter it by reason. Click an alert to see its photo and details; if the camera could not read the plate, the guard can type it there. **Mark as reviewed** moves an alert to the Reviewed tab, with an **Undo**; a reviewed alert can also be moved back from its details. **Mark all as reviewed** asks first and only marks the reason being shown. In the sidebar, the amber badge on Live Log counts vehicles waiting now; the red badge on Alerts counts alerts not yet reviewed.
 
 After pulling new code, run `flask init-db` once. It adds any new database columns and keeps your existing records.
 

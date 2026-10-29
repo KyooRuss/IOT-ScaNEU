@@ -106,6 +106,48 @@ window.ScaNEU = (() => {
     return h ? `${h}h ${m}m` : `${m}m`;
   }
 
+  // ---- vehicle details window (Live Log and Alerts) ---------------------------
+
+  // Where the plate came from when the camera could not read it.
+  function plateSource(log) {
+    if (!log.plate_read || !log.flags.includes("plate_unreadable")) return null;
+    return log.flags.includes("plate_corrected") ? "typed by guard" : "from card";
+  }
+
+  function detail(label, value) {
+    return el("div", { class: "detail" }, el("div", { class: "detail-label" }, label), el("div", { class: "detail-value" }, value));
+  }
+
+  // Photo on the left; plate, status and the record on the right. `rows` are the
+  // page's own detail() cells, `extra` goes under everything else.
+  function vehicleDetails(log, { note = null, rows = [], extra = null } = {}) {
+    const source = plateSource(log);
+    return el("div", { class: "row g-3" },
+      el("div", { class: "col-md-6" },
+        el("div", { class: "modal-photo" }, photo(log, log.exit_image_path || log.entry_image_path, "camera-photo"))),
+      el("div", { class: "col-md-6" },
+        el("div", { class: "d-flex align-items-center justify-content-between gap-2 mb-3" },
+          el("div", {},
+            el("span", { class: "plate-big" }, formatPlate(log.plate_read) || "Unreadable"),
+            source ? el("div", { class: "small text-muted-2" }, `Plate ${source}`) : null),
+          statusPill(log)),
+        note ? el("p", { class: "text-muted-2 mb-3" }, note) : null,
+        el("div", { class: "detail-grid" },
+          detail("Type", typeLabel(log)),
+          detail("Card holder", log.holder_name || "—"),
+          detail("Vehicle", vehicleText(log)),
+          detail("RFID card", log.rfid_uid || "None"),
+          detail("Time in", log.time_in || "—"),
+          detail("Time out", log.time_out || "—"),
+          detail("Stay", duration(log.stay_duration_s)),
+          rows,
+        ),
+        flagChips(log.flags).length ? el("div", { class: "mt-3" }, flagChips(log.flags)) : null,
+        extra,
+      ),
+    );
+  }
+
   // ---- live socket ----------------------------------------------------------
 
   const socket = io();
@@ -215,5 +257,6 @@ window.ScaNEU = (() => {
   return {
     el, postJSON, socket, decide, hooks, FLAG_LABELS,
     status, statusPill, ownerType, typeLabel, vehicleText, vehicleIcon, photo, flagChips, formatPlate, timeShort, duration,
+    plateSource, detail, vehicleDetails,
   };
 })();

@@ -1,28 +1,71 @@
 {% extends "base.html" %}
+{% from "_macros.html" import vehicle_modal %}
 {% block title %}Alerts{% endblock %}
 {% block page_title %}Alerts{% endblock %}
 {% block page_subtitle %}Records to check later.{% endblock %}
 {% block content %}
+{% set show = 'reviewed' if reviewed else none %}
+{% set reason_label = alert_labels[reason] if reason else none %}
 <div class="notif-wrap">
   <section class="panel notif-panel">
     <div class="notif-header">
-      <nav class="tabs" aria-label="Alert filter">
-        <a class="tab {{ 'active' if not reviewed }}" href="{{ url_for('guard.alerts') }}" {{ 'aria-current="page"'|safe if not reviewed }}>
+      <nav class="tabs" aria-label="Alert list">
+        <a class="tab {{ 'active' if not reviewed }}" href="{{ url_for('guard.alerts', reason=reason) }}" {{ 'aria-current="page"'|safe if not reviewed }}>
           To review <span class="tab-count" data-count="alert" {{ 'hidden' if not alert_count }}>{{ alert_count }}</span>
         </a>
-        <a class="tab {{ 'active' if reviewed }}" href="{{ url_for('guard.alerts', show='reviewed') }}" {{ 'aria-current="page"'|safe if reviewed }}>Reviewed</a>
+        <a class="tab {{ 'active' if reviewed }}" href="{{ url_for('guard.alerts', show='reviewed', reason=reason) }}" {{ 'aria-current="page"'|safe if reviewed }}>Reviewed</a>
       </nav>
       {% if not reviewed %}
       <button class="btn btn-link notif-all" id="review-all" type="button"><i class="bi bi-check2-all"></i> Mark all as reviewed</button>
       {% endif %}
     </div>
+    <nav class="notif-filters" aria-label="Filter by reason">
+      {% for key, label in [(none, 'All')] + alert_labels.items()|list %}
+      {% set count = counts[key or 'all'] %}
+      <a class="filter {{ 'active' if key == reason }} {{ 'is-empty' if not count }}" href="{{ url_for('guard.alerts', show=show, reason=key) }}" {{ 'aria-current="page"'|safe if key == reason }}>
+        {{ label }} <span class="filter-count" data-reason-count="{{ key or 'all' }}">{{ count }}</span>
+      </a>
+      {% endfor %}
+    </nav>
     <ul id="alerts" class="notif-list"></ul>
-    <div id="alerts-empty" class="empty-state">
+    <div id="alerts-empty" class="empty-state" hidden>
       <i class="bi bi-check2-circle"></i>
-      <p class="mb-0">{{ 'No reviewed alerts yet.' if reviewed else "You're all caught up." }}</p>
+      <p class="mb-0">
+        {%- if reviewed and reason %}No reviewed “{{ reason_label }}” alerts yet.
+        {%- elif reviewed %}No reviewed alerts yet.
+        {%- elif reason %}No “{{ reason_label }}” alerts to review.
+        {%- else %}You're all caught up.{% endif -%}
+      </p>
+    </div>
+    <div class="notif-more" id="load-more-wrap" hidden>
+      <button class="btn btn-light btn-sm" id="load-more" type="button">Load more</button>
     </div>
   </section>
 </div>
+
+{% if not reviewed %}
+<div class="modal fade" id="review-all-modal" tabindex="-1" aria-labelledby="review-all-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5" id="review-all-title">Mark all as reviewed?</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body"><p class="mb-0" data-review-all-text></p></div>
+      <div class="modal-footer">
+        <span class="text-danger small me-auto" role="alert" data-review-all-error></span>
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-neu" id="review-all-confirm">Mark all as reviewed</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{{ vehicle_modal() }}
+
+{# "Marked as reviewed · Undo"; bottom corner so it never covers the waiting-vehicle pop-ups #}
+<div class="toast-container notices position-fixed bottom-0 end-0 p-3" id="notices" aria-live="polite"></div>
 
 <script id="initial-state" type="application/json">{{ state|tojson }}</script>
 <script id="alert-labels" type="application/json">{{ alert_labels|tojson }}</script>
