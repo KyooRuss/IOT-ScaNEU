@@ -2,13 +2,15 @@
 
 Registered only when SCANEU_SIMULATOR=1. It calls the same gate service the
 real hardware will, so everything the dashboard shows is the real pipeline.
+Each route prints the serial message the real Arduino will send for that action
+(UID, IR, BTN); the serial reader on the Pi will replace these routes.
 """
 from dataclasses import asdict
 
 from flask import Blueprint, jsonify, render_template, request
 
 from ..db import get_db
-from ..gate import service
+from ..gate import serial_log, service
 
 bp = Blueprint("dev", __name__, url_prefix="/dev")
 
@@ -43,7 +45,11 @@ def vehicle():
     if lane is None:
         return jsonify(error="Unknown lane."), 400
     plate = None if data.get("plate_unreadable") else data.get("plate")
-    log_id, decision = service.handle_vehicle(lane, rfid_uid=data.get("rfid_uid"), plate_text=plate)
+    rfid_uid = (data.get("rfid_uid") or "").strip()
+    if rfid_uid:  # no card tapped: the Arduino sends nothing
+        serial_log.from_arduino(lane, f"UID:{rfid_uid}", "card tapped")
+    serial_log.from_camera(lane, (plate or "").strip())
+    log_id, decision = service.handle_vehicle(lane, rfid_uid=rfid_uid, plate_text=plate)
     return jsonify(log_id=log_id, decision=asdict(decision))
 
 
@@ -53,7 +59,12 @@ def ir():
     lane = _lane(data)
     if lane is None:
         return jsonify(error="Unknown lane."), 400
-    service.controller().set_vehicle_present(lane, bool(data.get("present")))
+    present = bool(data.get("present"))
+    if present:
+        serial_log.from_arduino(lane, "IR:1", "vehicle under barrier")
+    else:
+        serial_log.from_arduino(lane, "IR:0", "barrier clear")
+    service.controller().set_vehicle_present(lane, present)
     return jsonify(ok=True)
 
 
@@ -64,5 +75,6 @@ def button():
     lane = _lane(data)
     if lane is None:
         return jsonify(error="Unknown lane."), 400
+    serial_log.from_arduino(lane, "BTN", "manual button pressed")
     service.controller().open(lane)
     return jsonify(ok=True)
