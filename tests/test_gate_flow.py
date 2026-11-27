@@ -1,4 +1,7 @@
 """The gate pipeline against a real (temporary) database, as the simulator drives it."""
+import logging
+import time
+
 from scaneu.db import TABLES, get_db
 from scaneu.extensions import socketio
 from scaneu.gate import service
@@ -103,6 +106,35 @@ def test_guard_decision_over_socket(app, client):
 def test_simulator_endpoint(client):
     res = client.post("/dev/simulator/vehicle", json={"lane": "entrance", "rfid_uid": "04A1B2C3", "plate": "ABC1234"})
     assert res.status_code == 200 and res.json["decision"]["open_barrier"] is True
+
+
+def test_simulator_prints_arduino_messages(app, client, caplog, monkeypatch):
+    """One car through the entrance: each serial message, in order, from the code that will send or receive it."""
+    monkeypatch.setattr(app.extensions["gate_controller"], "_close_delay", 0)
+    logger = logging.getLogger("scaneu.arduino")
+    caplog.set_level(logging.INFO, logger="scaneu.arduino")
+    logger.addHandler(caplog.handler)  # serial_log does not pass its lines on to pytest's handler
+    try:
+        client.post("/dev/simulator/vehicle", json={"lane": "entrance", "rfid_uid": "04A1B2C3", "plate": "ABC1234"})
+        client.post("/dev/simulator/ir", json={"lane": "entrance", "present": True})
+        client.post("/dev/simulator/ir", json={"lane": "entrance", "present": False})
+        deadline = time.monotonic() + 2
+        while len(caplog.records) < 6 and time.monotonic() < deadline:  # CLOSE comes from a timer thread
+            time.sleep(0.01)
+        client.post("/dev/simulator/vehicle", json={"lane": "exit", "plate_unreadable": True})
+    finally:
+        logger.removeHandler(caplog.handler)
+
+    assert [(r.args[2], r.filename) for r in caplog.records] == [
+        ("UID:04A1B2C3", "routes.py"),
+        ("ABC1234", "routes.py"),
+        ("OPEN", "controller.py"),
+        ("IR:1", "routes.py"),
+        ("IR:0", "routes.py"),
+        ("CLOSE", "controller.py"),
+        ("(none)", "routes.py"),  # no card at the exit, plate unreadable: only the camera line
+        ("DENY", "controller.py"),
+    ]
 
 
 # ---- Alerts (records to review later) ----

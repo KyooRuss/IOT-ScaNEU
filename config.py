@@ -27,6 +27,8 @@ class Config:
 
     # Mock gate + /dev/simulator page. Turn off on the Pi once the Arduinos are wired.
     SIMULATOR = _flag("SCANEU_SIMULATOR", "1")
+    # Print every Pi <-> Arduino message to the terminal (scaneu/gate/serial_log.py).
+    ARDUINO_LOG = _flag("SCANEU_ARDUINO_LOG", "1")
 
     # Safety rules from the doc: close 3 s after the IR sensor is clear.
     BARRIER_CLOSE_DELAY = float(os.environ.get("SCANEU_BARRIER_CLOSE_DELAY", "3"))

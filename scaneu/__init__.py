@@ -8,6 +8,7 @@ from config import BASE_DIR, Config
 from . import db
 from .extensions import csrf, socketio
 from .gate import events  # noqa: F401  Socket.IO handlers must be registered before socketio.init_app()
+from .gate import serial_log
 from .gate.access_rules import FLAG_LABELS
 from .gate.controller import MockGateController
 from .gate.service import LANES, alert_count, pending_count
@@ -26,6 +27,7 @@ def create_app(test_config=None):
     db.init_app(app)
     csrf.init_app(app)
     socketio.init_app(app)
+    serial_log.init_app(app)
 
     # The Arduino serial controller will replace this on the Pi.
     app.extensions["gate_controller"] = MockGateController(

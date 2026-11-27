@@ -4,9 +4,12 @@ MockGateController stands in for the Arduinos until the serial link exists. It
 applies the same safety rules the Arduino sketch must follow:
   * never close while the IR sensor sees a vehicle under the barrier
   * close `close_delay` seconds after the IR sensor is clear
-Every state change is pushed to the dashboard as a "barrier" Socket.IO event.
+Every state change is pushed to the dashboard as a "barrier" Socket.IO event, and
+each command the real Arduino will receive (OPEN, DENY, CLOSE) is printed by serial_log.
 """
 import threading
+
+from . import serial_log
 
 
 class GateController:
@@ -42,11 +45,13 @@ class MockGateController(GateController):
             state.update(barrier="open", led="green")
             if not state["vehicle_present"]:
                 self._schedule_close(lane, self._open_timeout)
+        serial_log.to_arduino(lane, "OPEN", "lift barrier, green LED, short beep")
         self._emit(lane, buzzer="short")
 
     def hold(self, lane):
         with self._lock:
             self._lanes[lane]["led"] = "red"
+        serial_log.to_arduino(lane, "DENY", "stay closed, red LED, long beep")
         self._emit(lane, buzzer="long")
 
     def set_vehicle_present(self, lane, present):
@@ -85,6 +90,7 @@ class MockGateController(GateController):
             if state["vehicle_present"]:
                 return  # safety: the IR clear event will schedule the close
             state.update(barrier="closed", led="off")
+        serial_log.to_arduino(lane, "CLOSE", "lower barrier")
         self._emit(lane)
 
     def _emit(self, lane, buzzer=None):

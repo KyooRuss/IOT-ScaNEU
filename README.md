@@ -91,6 +91,14 @@ This is one text line per message over USB at 9600 baud:
 
 A `SerialGateController` with the same methods as `MockGateController` will replace the mock on the Pi.
 
+Until the Arduinos are connected, the terminal running `python run.py` prints every one of these messages as the simulator sends vehicles, ending with the file and line that will send or receive it:
+```
+10:25:28  entrance  Arduino -> Pi  UID:04A1B2C3   card tapped                          dev/routes.py:50
+10:25:28  entrance  Camera -> Pi   ABC1234        plate read                           dev/routes.py:51
+10:25:28  entrance  Pi -> Arduino  OPEN           lift barrier, green LED, short beep  gate/controller.py:48
+```
+The camera line is not an Arduino message; it is there to show the order. Set `SCANEU_ARDUINO_LOG=0` in `.env` to turn the log off.
+
 ## Next steps
 - Guard form to register visitor details (driver, ID type, purpose, destination → `visit_details`)
 - Admin add/edit for card holders and vehicles
